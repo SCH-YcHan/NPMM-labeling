@@ -1,3 +1,3 @@
 # NPMM-labeling
 
-2023 06 부터 공사시작
+A machine learning trading system for the stock market based on N-period Min-Max labeling using XGBoost
