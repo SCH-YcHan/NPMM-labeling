@@ -30,6 +30,10 @@ NASDAQ_labeling <- NASDAQ_adj %>%
   do.call(cbind, .) %>%
   cbind(Date=NASDAQ_adj$Date, .)
 
+if (!file.exists("../data/Stock_Labeling")){
+  dir.create("../data/Stock_Labeling")
+}
+
 write.csv(NASDAQ_labeling ,"../data/Stock_Labeling/NASDAQ_labeling.csv", row.names=F)
 
 # NASDAQ_merge <- merge(NASDAQ_adj, NASDAQ_labeling, by="Date")

@@ -1,13 +1,15 @@
 rm(list=ls())
 
+install.packages("catboost")
+library(catboost)
 library(foreach)
 library(doParallel)
 library(caret)
 source("Labeling_code.R")
 
-labeling_file <- read.csv("./Stock_Labeling/NASDAQ_labeling.csv")
+labeling_file <- read.csv("../data/Stock_Labeling/NASDAQ_labeling.csv")
 
-NASDAQ_names <- list.files("./Stock_TI")
+NASDAQ_names <- list.files("../data/Stock_TI")
 
 #실험에서 제외할 주식
 rm_stock <- c("KDP_TI.csv", "KLAC_TI.csv", "MDLZ_TI.csv", "PLUG_TI.csv")
@@ -25,7 +27,7 @@ pac <- c("stringr", "dplyr", "lubridate")
 #NASDAQ stock + Label
 NASDAQ <- foreach::foreach(index=NASDAQ_names, .combine=rbind, .packages=pac) %dopar% {
   name <<- index
-  stock_ti <- read.csv(paste0("./Stock_TI/", name))
+  stock_ti <- read.csv(paste0("../data/Stock_TI/", name))
   Symbol <- str_split(name, "_")[[1]][1]
   label <- labeling_file %>% 
     select(Date, contains(paste0(Symbol,".")))
@@ -35,6 +37,18 @@ NASDAQ <- foreach::foreach(index=NASDAQ_names, .combine=rbind, .packages=pac) %d
     cbind(Symbol=Symbol,.) %>% 
     merge(label, by="Date") %>% 
     filter(as.Date(Date) < "2021-01-01")
+}
+
+if (!file.exists("../data/train_instance")){
+  dir.create("../data/train_instance")
+}
+
+if (!file.exists("../data/test_prediction")){
+  dir.create("../data/test_prediction")
+}
+
+if (!file.exists("../data/ML_result")){
+  dir.create("../data/ML_result")
 }
 
 #병렬처리 + 자동화
@@ -122,8 +136,8 @@ Parallel_processing <- function(Stock, Symb, Comb, Pac, Ex, Method, Period,
         label <- c(label, test_pre)
       }
 
-      write.csv(train_N, paste0("./train_instance/",symb,Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
-      write.csv(data.frame(pred=label), paste0("./test_prediction/",symb,Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
+      write.csv(train_N, paste0("../data/train_instance/",symb,Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
+      write.csv(data.frame(pred=label), paste0("../data/test_prediction/",symb,Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
       
       label <- ifelse(label>0.75, 2, ifelse(label<0.25, 1, 0))
       
@@ -147,7 +161,7 @@ Parallel_processing <- function(Stock, Symb, Comb, Pac, Ex, Method, Period,
         cbind(train_N) %>% 
         .[c(1,11,12,2:10)]
   }
-  write.csv(result, paste0("./ML_result/",Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
+  write.csv(result, paste0("../data/ML_result/",Use_Model,Dep_Label,Method,Period,".csv"), row.names=F)
 }
 
 Symbols <- str_split(NASDAQ_names, "_", simplify=T)[,1]
