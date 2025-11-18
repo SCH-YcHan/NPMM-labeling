@@ -12,26 +12,18 @@ A reference implementation for the paper ["A machine learning trading system for
 
 ## Labeling methods
 All labelers operate on adjusted closing prices and can optionally log intermediate calculations.
-- **UpDown (`UpDown`)**: Marks positive N-step returns as 1 and negative as 2; default horizon is 1 day.【F:code/Labeling_code.R†L7-L18】
-- **N-day volatility/return (`Nday_VDP`)**: Compares N-day log returns against dynamic upper/lower thresholds derived from the series mean and standard deviation; labels 1 (upper), 2 (lower), or 0 (neutral).【F:code/Labeling_code.R†L20-L52】
-- **N-day barrier (`Nday_Barrier`)**: Looks ahead N days to see which barrier (upper or lower) is hit first and assigns 1 or 2 accordingly, or 0 if untouched.【F:code/Labeling_code.R†L54-L99】
-- **Trade-action (`Trade_action`)**: Slides a window (e.g., 11 days) and labels the midpoint as a buy (1) if it is the local minimum, sell (2) if it is the local maximum, otherwise 0.【F:code/Labeling_code.R†L101-L131】
+- **UpDown (`UpDown`)**: Marks positive N-step returns as 1, negative as 2, and flat as 0. The default horizon is 1 day.
+- **N-day volatility/return (`Nday_VDP`)**: Compares N-day log returns against dynamic upper/lower thresholds derived from the series mean and standard deviation; labels 1 (upper), 2 (lower), or 0 (neutral).
+- **N-day barrier (`Nday_Barrier`)**: Looks ahead N days to see which barrier (upper or lower) is hit first and assigns 1 or 2 accordingly, or 0 if untouched.
+- **Trade-action (`Trade_action`)**: Slides a window (e.g., 11 days) and labels the midpoint as a buy (1) if it is the local minimum, sell (2) if it is the local maximum, otherwise 0.
 
-Utility helpers include `instance_selection()` for pruning duplicate sequential labels, `data_split()` for hold-out or time-series cross-validation splits, and `labeling_metrics()` for computing win rate, payoff ratio, profit factor, and cumulative profit for a labeled series.【F:code/Labeling_code.R†L133-L210】【F:code/Labeling_code.R†L212-L281】
+Utility helpers include `instance_selection()` for pruning duplicate sequential labels, `data_split()` for hold-out or time-series cross-validation splits, and `labeling_metrics()` for computing win rate, payoff ratio, profit factor, and cumulative profit for a labeled series.
 
 ## Workflow
 1. **Download price data**: Run `code/1. Yahoo_Finance_Crawl.ipynb` to fetch NASDAQ-100 OHLCV data and save it under `data/`.
 2. **Generate technical indicators**: Execute `code/2. NASDAQ_TA-Lib_Extraction.ipynb` to compute TA-Lib features, producing one CSV per symbol in `data/Stock_TI/`.
-3. **Create labels**: From the `code/` directory, execute:
-   ```r
-   Rscript '3. NASDAQ_Labeling.R'
-   ```
-   This script reads `data/NASDAQ100.csv`, applies all labeling functions to each symbol, and writes the combined table to `data/Stock_Labeling/NASDAQ_labeling.csv`. The script will create the output directory if needed.【F:code/3. NASDAQ_Labeling.R†L1-L36】
-4. **Train and evaluate models**: Install the listed R packages (e.g., `catboost`, `xgboost`, `gbm`, `lightgbm`, `adabag`, `e1071`), then run:
-   ```r
-   Rscript '4. Label_Prediction.R'
-   ```
-   The script merges technical indicators with labels, performs rolling time-series cross-validation, trains the selected model (`Use_Model`), and writes predictions to `data/test_prediction/` plus aggregated metrics to `data/ML_result/`.【F:code/4. Label_Prediction.R†L1-L125】【F:code/4. Label_Prediction.R†L164-L204】 Adjust the `exg` grid near the bottom of the script to explore different cross-validation periods or model choices.【F:code/4. Label_Prediction.R†L153-L204】
+3. **Create labels**: From the `code/` directory, run `Rscript "3. NASDAQ_Labeling.R"`. The script reads `data/NASDAQ100.csv`, applies all labeling functions to each symbol, and writes the combined table to `data/Stock_Labeling/NASDAQ_labeling.csv`. The script will create the output directory if needed.
+4. **Train and evaluate models**: Install the listed R packages (e.g., `catboost`, `xgboost`, `gbm`, `lightgbm`, `adabag`, `e1071`), then run `Rscript "4. Label_Prediction.R"`. The script merges technical indicators with labels, performs rolling time-series cross-validation, trains the selected model (`Use_Model`), and writes predictions to `data/test_prediction/` plus aggregated metrics to `data/ML_result/`. Adjust the `exg` grid near the bottom of the script to explore different cross-validation periods or model choices.
 
 ## Data expectations
 - `data/NASDAQ100.csv` (and related CSVs) supply historical prices for each constituent symbol with column names ending in `Adj.Close`.
