@@ -3,38 +3,51 @@ library(ggplot2)
 library(stringr)
 library(lubridate)
 
-#Up Down 기본 모형
-UpDown <- function(close_data, N=1, logging=F){
-  lead1 <- lead(close_data, n=N)
+write_log_csv <- function(data, filename) {
+  dir.create("Logging", showWarnings = FALSE)
+  write.csv(data, file.path("Logging", filename), row.names = FALSE)
+}
 
-  label <- ifelse(lead1-close_data>0, 1, 2)
-  
-  if(logging==T){
-    log_df <- data.frame(close_data = close_data,
-                         lead = lead1,
-                         log_profit = log(lead1)-log(close_data),
-                         label = label)
-    write.csv(log_df,"./Logging/UpDown.csv", row.names=F)
+#Up Down 기본 모형
+UpDown <- function(close_data, N = 1, logging = FALSE) {
+  lead1 <- lead(close_data, n = N)
+
+  label <- case_when(
+    is.na(lead1) ~ NA_integer_,
+    (lead1 - close_data) > 0 ~ 1L,
+    (lead1 - close_data) < 0 ~ 2L,
+    TRUE ~ 0L
+  )
+
+  if (logging) {
+    log_df <- data.frame(
+      close_data = close_data,
+      lead = lead1,
+      log_profit = log(lead1) - log(close_data),
+      label = label
+    )
+
+    write_log_csv(log_df, "UpDown.csv")
   }
-  
+
   return(label)
 }
 
 #N-day 변동성/수익률 모형
-Nday_VDP <- function(close_data, u_sig=0.2, l_sig=0.2, N=5,
-                     plotting=F, plot_name="", logging=F){
+Nday_VDP <- function(close_data, u_sig = 0.2, l_sig = 0.2, N = 5,
+                    plotting = FALSE, plot_name = "", logging = FALSE) {
   Nlead <- lead(close_data, N)
-  
-  rtn <- log(Nlead)-log(close_data)
-  
-  rtn_mean <- mean(rtn, na.rm=T)
-  rtn_sd <- sd(rtn, na.rm=T)
 
-  upper <- rtn_mean+rtn_sd*u_sig
-  lower <- rtn_mean-rtn_sd*l_sig
-  label <- ifelse(rtn>upper, 1, ifelse(rtn<lower, 2, 0))
-  
-  if(logging==T){
+  rtn <- log(Nlead) - log(close_data)
+
+  rtn_mean <- mean(rtn, na.rm = TRUE)
+  rtn_sd <- sd(rtn, na.rm = TRUE)
+
+  upper <- rtn_mean + rtn_sd * u_sig
+  lower <- rtn_mean - rtn_sd * l_sig
+  label <- ifelse(rtn > upper, 1, ifelse(rtn < lower, 2, 0))
+
+  if (logging) {
     log_df <- data.frame(close_data = close_data,
                          lead = Nlead,
                          rtn = rtn,
@@ -43,10 +56,11 @@ Nday_VDP <- function(close_data, u_sig=0.2, l_sig=0.2, N=5,
                          upper = upper,
                          lower = lower,
                          label = label)
-    write.csv(log_df,paste0("./Logging/",N,"day_VDP.csv"), row.names = F)
+
+    write_log_csv(log_df, paste0(N, "day_VDP.csv"))
   }
 
-  if(plotting==T){
+  if (plotting) {
     png(paste0(plot_name, ".png"), width=3000, height=1800, res=300)
     hist(
       rtn,
@@ -72,13 +86,13 @@ Nday_VDP <- function(close_data, u_sig=0.2, l_sig=0.2, N=5,
 }
 
 #N-day Barrier 모형
-Nday_Barrier <- function(close_data, u_sig=0.2, l_sig=0.2, N=20,
-                         plotting=F, plot_name="", logging=F){
+Nday_Barrier <- function(close_data, u_sig = 0.2, l_sig = 0.2, N = 20,
+                        plotting = FALSE, plot_name = "", logging = FALSE) {
   Nlead <- lead(close_data, N)
   
   rtn <- log(Nlead)-log(close_data)
-  upper <- sd(rtn, na.rm=T)*u_sig
-  lower <- sd(rtn, na.rm=T)*-l_sig
+  upper <- sd(rtn, na.rm = TRUE) * u_sig
+  lower <- sd(rtn, na.rm = TRUE) * -l_sig
   
   label <- c()
   
@@ -87,9 +101,9 @@ Nday_Barrier <- function(close_data, u_sig=0.2, l_sig=0.2, N=20,
   for(i in 1:(length(close_data)-N)){
     data <- close_data[i:(i+N)]
     rtn_i <- log(data[2:(N+1)])-log(data[1])
-    
+
     labels <- ifelse(rtn_i>upper, 1, ifelse(rtn_i<lower, 2, 0))
-    
+
     sul <- sum(unique(labels))
     if(sul==0){
       label <- c(label, 0)
@@ -106,7 +120,7 @@ Nday_Barrier <- function(close_data, u_sig=0.2, l_sig=0.2, N=20,
       touch_idx <- c(touch_idx, which(labels==first)[1])
     }
   }
-  if(logging==T){
+  if(logging){
     log_df <- data.frame(close_data = close_data,
                          lead = Nlead,
                          rtn = rtn,
@@ -114,13 +128,13 @@ Nday_Barrier <- function(close_data, u_sig=0.2, l_sig=0.2, N=20,
                          lower = lower,
                          touch_idx = c(touch_idx, rep(NA, N)),
                          label = c(label, rep(NA, N)))
-    write.csv(log_df,paste0("./Logging/",N,"day_Barrier.csv"), row.names = F)
+    write_log_csv(log_df, paste0(N, "day_Barrier.csv"))
   }
   return(c(label, rep(NA,N)))
 }
 
 #Trade action 모형
-Trade_action <- function(close_data, window=11, logging=F){
+Trade_action <- function(close_data, window = 11, logging = FALSE){
   label <- c()
   m_i <- floor(window/2)+1
   min_idx <- c()
@@ -132,23 +146,23 @@ Trade_action <- function(close_data, window=11, logging=F){
     max_idx <- c(max_idx, which.max(data))
     label <- c(label, labels)
   }
-  if(logging==T){
+  if(logging){
     log_df <- data.frame(close_data = close_data,
                          median_idx = m_i,
                          min_idx = c(rep(NA, m_i-1), min_idx, rep(NA, window-m_i)),
                          max_idx = c(rep(NA, m_i-1), max_idx, rep(NA, window-m_i)),
                          label = c(rep(NA, m_i-1), label, rep(NA, window-m_i)))
-    write.csv(log_df,paste0("./Logging/",window,"Trade_action.csv"), row.names = F)
+    write_log_csv(log_df, paste0(window, "Trade_action.csv"))
   }
   return(c(rep(NA, m_i-1), label, rep(NA, window-m_i)))
 }
 
 #instance selection
-instance_selection <- function(data, Dep_Label, dup=T){
-  if (dup==T){
-    data2 <- data %>% 
-      filter(get(Dep_Label) != 0) %>% 
-      mutate(Train_N_before = nrow(.)) %>% 
+instance_selection <- function(data, Dep_Label, dup = TRUE){
+  if (dup){
+    data2 <- data %>%
+      filter(get(Dep_Label) != 0) %>%
+      mutate(Train_N_before = nrow(.)) %>%
       mutate(label2 = ifelse(get(Dep_Label)-lag(get(Dep_Label))!=0 |
                                is.na(get(Dep_Label)-lag(get(Dep_Label))), get(Dep_Label), 0)) %>% 
       filter(label2 != 0)
@@ -170,7 +184,7 @@ instance_selection <- function(data, Dep_Label, dup=T){
 }
 
 #profit calculate
-labeling_metrics <- function(data, merge_data, symbol, logging=F){
+labeling_metrics <- function(data, merge_data, symbol, logging = FALSE){
   data$label[nrow(data)]=2
   
   data2 <- data %>% 
@@ -178,7 +192,7 @@ labeling_metrics <- function(data, merge_data, symbol, logging=F){
     filter(label != 0) %>% 
     mutate(label = ifelse(label-lag(label)!=0 | is.na(label-lag(label)), label, 0)) %>%
     filter(label != 0) %>% 
-    merge(merge_data, by="Date", all=T) %>% 
+    merge(merge_data, by="Date", all=TRUE) %>%
     filter(!is.na(label))
   
   if(length(data2$label)==1 & data2$label[1]==2){
@@ -196,12 +210,18 @@ labeling_metrics <- function(data, merge_data, symbol, logging=F){
   
   data3 <- data2 %>%
     filter(!is.na(label)) %>%
-    mutate(profit = Open-lag(Open,1)) %>% 
-    filter(label == 2) 
-  
-  if(logging==T){
-    write.csv(merge(merge(data, data2, by="Date", all.x=T), data3, by="Date", all.x=T),
-              paste0("./Logging/", symbol, "_Profit.csv"), row.names=F)
+    mutate(profit = Open-lag(Open,1)) %>%
+    filter(label == 2)
+
+  if(logging){
+    merged_log <- merge(
+      merge(data, data2, by = "Date", all.x = TRUE),
+      data3,
+      by = "Date",
+      all.x = TRUE
+    )
+
+    write_log_csv(merged_log, paste0(symbol, "_Profit.csv"))
   }
   
   N_trade <- nrow(data3)
@@ -224,7 +244,7 @@ labeling_metrics <- function(data, merge_data, symbol, logging=F){
 }
 
 #Data Split function
-data_split <- function(Data, method="HoldOut", period="Y", TEST_Date="2018-01-01", logging=F){
+data_split <- function(Data, method="HoldOut", period="Y", TEST_Date="2018-01-01", logging=FALSE){
   DDD <- as.Date(Data$Date)
   if(method=="HoldOut"){
     Data <- Data %>% 
@@ -287,8 +307,8 @@ data_split <- function(Data, method="HoldOut", period="Y", TEST_Date="2018-01-01
   }else{
     print("Error : method = 'HoldOut' or 'TsCV' or 'SWTsCV'")
   }
-  if(logging==T){
-    write.csv(Data, paste0("./Logging/", method, "_Split_",  period, ".csv"), row.names=F)
+  if(logging){
+    write_log_csv(Data, paste0(method, "_Split_",  period, ".csv"))
   }
   return(Data)
 }
